@@ -40,45 +40,10 @@ public class JwtAuthorizationFilter extends BasicAuthenticationFilter {
             String jwtToken = request.getHeader(JwtProperty.HEADER).replace(JwtProperty.TOKEN_PREFIX, "");
             JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(redisService);
             if(jwtTokenProvider.isTokenExpired(jwtToken)){
-                try {
+                response.sendError(401);
+                return;
+            }
 
-                    String accessToken = jwtTokenProvider.findRefreshToken(request)
-                            .validateRefreshToken()
-                            .regenerateAccessToken();
-
-                    response.addHeader(JwtProperty.HEADER, JwtProperty.TOKEN_PREFIX + accessToken);
-
-                    JwtResponse responseAccessToken = JwtResponse.builder()
-                            .header(JwtProperty.HEADER)
-                            .accessToken(JwtProperty.TOKEN_PREFIX + accessToken)
-                            .build();
-
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    response.getWriter().write(objectMapper.writeValueAsString(responseAccessToken));
-                    return;
-
-                } catch (RefreshTokenNotFoundException e){
-                    log.error("RefreshToken Error!", e);
-                    ErrorResponse error = ErrorResponse.customBuilder()
-                            .error("RefreshTokenNotFoundException")
-                            .status(404)
-                            .message("Can not Found Refresh Token.")
-                            .build();
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    response.getWriter().write(objectMapper.writeValueAsString(error));
-                    return;
-                } catch (RefreshTokenNotValidateException e){
-                    log.error("RefreshToken Error!", e);
-                    ErrorResponse error = ErrorResponse.customBuilder()
-                            .error("RefreshTokenNotValidatedException")
-                            .status(400)
-                            .message("Refresh Token is Not Validated.")
-                            .build();
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    response.getWriter().write(objectMapper.writeValueAsString(error));
-                    return;
-                }
-            } else{
                 String username = jwtTokenProvider.getUsername(jwtToken);
                 User user = userService.findByUsername(username);
                 PrincipalDetails principalDetails = new PrincipalDetails(user);
@@ -89,7 +54,6 @@ public class JwtAuthorizationFilter extends BasicAuthenticationFilter {
                 if(redisRefreshToken != null) {
                     redisService.setValues(username, redisRefreshToken);
                 }
-            }
         }
         chain.doFilter(request, response);
     }
